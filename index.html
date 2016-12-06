@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+</head>
+
+<body>
+
+<div>
+  <div>
+    <textarea id="user" class="login" placeholder="Nombre de usuario" rows="1" cols="50"></textarea>
+    <select id="room" class="login">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+
+  <button id="join">Unirse</button>
+  <button id="connect">Conectar</button>
+  <button id="exit">Salir</button>
+</div>
+
+  <a class="row">
+      <video id="localVideo" autoplay></video>
+      
+  </a>
+  <a>
+    <video id="remoteVideo" autoplay></video>
+  </a>
+  <a>
+    <canvas id="my-canvas" width="400" height="300">
+          Your browser does not support the HTML5 canvas element.
+    </canvas>
+  </a>
+  <div class="row">
+      <div>
+        <textarea id="chat" style="resize: none;" rows="6" cols="49" disabled></textarea>
+        <input type="text" id="inputchat" placeholder="Introduce tu mensaje y pulsa enviar.">
+        <button id="send" class="btn btn-default">Enviar</button>
+        <div id="errorMsg"></div>
+      </div>
+  </div>
+  <br>
+
+
+
+  <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+  <script src="adapter.js"></script>
+  <script src="node_modules/socket.io-client/socket.io.js"></script>
+  <script src="client.js"></script>
+      <style>
+        body {
+            background-color: grey;
+        }
+
+        canvas {
+            background-color: black;
+        }
+    </style>
+    <script src="gl-matrix-min.js"></script>
+    <script id="shader-vs" type="x-shader/x-vertex">
+        attribute vec3 aVertexPosition;
+      attribute vec3 aVertexColor;
+      varying highp vec4 vColor;
+
+        uniform mat4 uMVMatrix;
+        uniform mat4 uPMatrix;
+        void main(void) {
+             gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+       vColor = vec4(aVertexColor, 1.0);
+        }
+    </script>
+    <script id="shader-fs" type="x-shader/x-fragment">
+  varying highp vec4 vColor;
+        void main(void) {
+            gl_FragColor = vColor;
+        }
+    </script>
+    <script>
+        var gl = null,
+        canvas = null,
+        glProgram = null,
+        fragmentShader = null,
+        vertexShader = null;
+        var vertexPositionAttribute = null,
+            trianglesVerticeBuffer = null;
+        var vertexColorAttribute = null,
+            trianglesColorBuffer = null;
+      var mvMatrix = mat4.create();
+        function initWebGL() {
+            canvas = document.getElementById("my-canvas");
+            try {
+                gl = canvas.getContext("webgl") ||
+                     canvas.getContext("experimental-webgl");
+            } catch (e) {
+            }
+            if (gl) {
+                initShaders();
+                setupBuffers();
+                getUniforms();
+                (function animLoop() {
+                    setupWebGL();
+                    drawScene();
+                    requestAnimationFrame(animLoop, canvas);
+                })();
+            } else {
+                alert("Error: Your browser does not appear to support WebGL.");
+            }
+        }
+        function setupWebGL() {
+            //set the clear color to a shade of green
+            gl.clearColor(0.0, 0.0, 0.0, 0.0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        function initShaders() {
+            //get shader source
+            var fs_source = document.getElementById('shader-fs').innerHTML,
+             vs_source = document.getElementById('shader-vs').innerHTML;
+            //compile shaders
+            vertexShader = makeShader(vs_source, gl.VERTEX_SHADER);
+            fragmentShader = makeShader(fs_source, gl.FRAGMENT_SHADER);
+            //create program
+            glProgram = gl.createProgram();
+            //attach and link shaders to the program
+            gl.attachShader(glProgram, vertexShader);
+            gl.attachShader(glProgram, fragmentShader);
+            gl.linkProgram(glProgram);
+            if (!gl.getProgramParameter(glProgram, gl.LINK_STATUS)) {
+                alert("Unable to initialize the shader program.");
+            }
+            //use program
+            gl.useProgram(glProgram);
+        }
+        function makeShader(src, type) {
+            //compile the vertex shader
+            var shader = gl.createShader(type);
+            gl.shaderSource(shader, src);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                alert("Error compiling shader: " + gl.getShaderInfoLog(shader));
+            }
+            return shader;
+        }
+        function setupBuffers() {
+            var triangleVertices = [
+                //triangle Vertices
+                -0.05, 0.05, 0.0,
+                0.05, -0.05, 0.0,
+                -0.05, -0.05, 0.0,
+                //Up triangle
+                0.05, 0.05, 0.0,
+                -0.05, 0.05, 0.0,
+                0.05, -0.05, 0.0,
+            ];
+            trianglesVerticeBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, trianglesVerticeBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices), gl.STATIC_DRAW);
+
+      var triangleColors = [
+                // triangle Colors
+                1.0, 1.0, 1.0,
+                1.0, 1.0, 1.0,
+                1.0, 1.0, 1.0,
+                1.0, 1.0, 1.0,
+                1.0, 1.0, 1.0,
+                1.0, 1.0, 1.0,
+            ];
+            trianglesColorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, trianglesColorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleColors), gl.STATIC_DRAW);
+        }
+        function drawScene() {
+            vertexPositionAttribute = gl.getAttribLocation(glProgram, "aVertexPosition");
+            gl.enableVertexAttribArray(vertexPositionAttribute);
+            gl.bindBuffer(gl.ARRAY_BUFFER, trianglesVerticeBuffer);
+            gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+
+            vertexColorAttribute = gl.getAttribLocation(glProgram, "aVertexColor");
+            gl.enableVertexAttribArray(vertexColorAttribute);
+            gl.bindBuffer(gl.ARRAY_BUFFER, trianglesColorBuffer);
+            gl.vertexAttribPointer(vertexColorAttribute, 3, gl.FLOAT, false, 0, 0);
+
+            drawball()
+            raqueta1()
+            raqueta2()
+
+        }
+
+        
+      function drawball(){
+            setUniforms(0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6); 
+        }
+
+        function raqueta1(){
+            setUniforms(1);
+            gl.drawArrays(gl.TRIANGLES, 0, 6); 
+        }
+
+        function raqueta2(){
+            setUniforms(2);
+            gl.drawArrays(gl.TRIANGLES, 0, 6); 
+        }
+        function getUniforms() {
+            glProgram.uMVMatrix = gl.getUniformLocation(glProgram, "uMVMatrix");
+
+            glProgram.uPMatrix = gl.getUniformLocation(glProgram, "uPMatrix");
+            var pMatrix = mat4.create();
+            var ratio = canvas.width/canvas.height;
+            mat4.ortho(-ratio, ratio, -1.0, 1.0, -10.0, 10.0, pMatrix);
+            gl.uniformMatrix4fv(glProgram.uPMatrix, false, pMatrix);
+        }
+
+        var angle = 0.0;
+
+        window.addEventListener('keydown', function(event) {
+          switch (event.keyCode) {
+            case 38: // Up
+              if(first){
+                if(rak1angley<=0.8){
+                    rak1angley=rak1angley+0.09
+                }
+                break;
+              }else{
+                if(rak2angley<=0.8){
+                    rak2angley=rak2angley+0.09
+                }
+                break;               
+              }
+            case 40: // Down
+              if(first){
+                if(rak1angley>=-0.8){
+                    rak1angley=rak1angley-0.09
+                }
+                break;
+              }else{
+                if(rak2angley>=-0.8){
+                    rak2angley=rak2angley-0.09
+                }
+                break;
+              }
+          }
+
+          if(first){
+            socket.emit('racket', JSON.stringify(rak1angley));
+          }else{
+            socket.emit('racket', JSON.stringify(rak2angley));
+          }
+
+        }, false);
+
+
+        function setUniforms(x) {
+
+            switch (x){
+                case 0:
+                  if(first){
+                    if(ballangley>=0.95 || ballangley<=-0.95){
+                        ballsumy=ballsumy*(-1)
+                    }else if(ballanglex>=1.20 || ballanglex<=-1.20){
+                         ballangley=0
+                         ballanglex=0
+                    }else if((Math.floor(ballanglex+0.1)==rak1anglex) && (ballangley-rak1angley>-0.08 && ballangley-rak1angley<0.15)){
+                        ballsumx=(-1)
+
+                    }else if((Math.ceil(ballanglex-0.1)==rak2anglex) && (ballangley-rak2angley>-0.08 && ballangley-rak2angley<0.15)){
+                        ballsumx=(1)
+
+                    }
+                    ballangley += (0.02*ballsumy);
+                    ballanglex += (0.01*ballsumx);
+                    var aux = {
+                      ballanglex: ballanglex,
+                      ballangley: ballangley
+                    };
+                    console.log("emito")
+                    socket.emit('ball', JSON.stringify(aux));
+                  }
+                    mat4.identity(mvMatrix);
+                    mat4.translate(mvMatrix, [ballanglex , ballangley, 0.0]);
+                    gl.uniformMatrix4fv(glProgram.uMVMatrix, false, mvMatrix);
+                    break
+                case 1:
+                    mat4.identity(mvMatrix);
+                    mat4.translate(mvMatrix, [rak1anglex , rak1angley, 0.0]);
+                    mat4.scale(mvMatrix, [1, 4, 0]);
+                    gl.uniformMatrix4fv(glProgram.uMVMatrix, false, mvMatrix);
+                    break
+                case 2:
+
+                    mat4.identity(mvMatrix);
+                    mat4.translate(mvMatrix, [rak2anglex , rak2angley, 0.0]);
+                    mat4.scale(mvMatrix, [1, 4, 0]);
+                    gl.uniformMatrix4fv(glProgram.uMVMatrix, false, mvMatrix);
+                    break
+            }
+        }
+    </script>
+
+
+</body>
+
+</html>
