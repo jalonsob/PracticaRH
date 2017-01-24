@@ -43,15 +43,15 @@ $(function() {
 });
 
 function onJoin(){
-  getUserData();
-  preparePeerConnection();
-  sendRoom();
   $("#join").hide();
   $("#connect").hide();
   $("#exit").show();
   $("#user").hide();
   $("#room").hide();
   getUserMedia();
+  getUserData();
+  preparePeerConnection();
+  sendRoom();
 }
 
 function getUserData(){

@@ -100,11 +100,8 @@
                 initShaders();
                 setupBuffers();
                 getUniforms();
-                (function animLoop() {
-                    setupWebGL();
-                    drawScene();
-                    requestAnimationFrame(animLoop, canvas);
-                })();
+                setupWebGL();
+                drawScene();
             } else {
                 alert("Error: Your browser does not appear to support WebGL.");
             }
@@ -187,6 +184,7 @@
             drawball()
             raqueta1()
             raqueta2()
+            requestAnimationFrame(drawScene);
 
         }
 
